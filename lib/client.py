@@ -147,23 +147,24 @@ class SlackBot(object):
         plugins = {}
         root_plugin_path = os.path.join(self.base_path, 'plugins')
         plugin_paths = [x[0] for x in os.walk(root_plugin_path)]
-        for plugin in self.config['enabled_plugins']:
-            loaded_plugin = None
-            for path in plugin_paths:
-                if os.path.basename(path) == plugin:
-                    files = os.listdir(path)
-                    for pfile in files:
-                        if str(pfile) == 'plugin.py':
-                            spec = importlib.util.spec_from_file_location(
-                                "module.name",
-                                os.path.join(root_plugin_path, path, pfile)
-                                )
-                            module = importlib.util.module_from_spec(spec)
-                            spec.loader.exec_module(module)
-                            plugins[plugin] = module.SlackBotPlugin
-                            loaded_plugin = True
-            if not loaded_plugin:
-                raise InvalidPlugin
+        if self.config['enabled_plugins']:
+            for plugin in self.config['enabled_plugins']:
+                loaded_plugin = None
+                for path in plugin_paths:
+                    if os.path.basename(path) == plugin:
+                        files = os.listdir(path)
+                        for pfile in files:
+                            if str(pfile) == 'plugin.py':
+                                spec = importlib.util.spec_from_file_location(
+                                    "module.name",
+                                    os.path.join(root_plugin_path, path, pfile)
+                                    )
+                                module = importlib.util.module_from_spec(spec)
+                                spec.loader.exec_module(module)
+                                plugins[plugin] = module.SlackBotPlugin
+                                loaded_plugin = True
+                if not loaded_plugin:
+                    raise InvalidPlugin
         return plugins
 
     def _register_plugins(self, plugins):

@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
 from chatterbot import ChatBot
+from chatterbot.trainers import ChatterBotCorpusTrainer
+
 from lib.builtins import BasePlugin
 import sys
 
@@ -13,14 +15,14 @@ class SlackBotPlugin(BasePlugin):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.chatbot = ChatBot(
-            'chatterbot',
-            trainer='chatterbot.trainers.ChatterBotCorpusTrainer'
+            'chatterbot'
         )
         self.initial_training()
         self.hooks = []
 
     def initial_training(self):
-        self.chatbot.train(
+        trainer = ChatterBotCorpusTrainer(self.chatbot)
+        trainer.train(
             "chatterbot.corpus.english"
         )
 
