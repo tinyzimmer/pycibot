@@ -1,37 +1,23 @@
 #!/usr/bin/python3
 
 from lib.builtins import BasePlugin
+from lib.config import SlackBotConfig as config
+from lib.logging import SlackBotLogger as logger
 from urllib.parse import urlsplit
 import feedparser
 import re
 
 
-class AnnouncedArticles(object):
-
-    def __init__(self):
-        self.records = {}
-
-    def emit(self, sub, item):
-        try:
-            if len(self.records[sub]) >= 10:
-                del self.records[sub][0]
-            self.records[sub].append(item)
-        except KeyError:
-            self.records[sub] = [item]
-
-
 class SlackBotPlugin(BasePlugin):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.subreddits = self.client.config['subreddits']
-        self.active_channels = self.client.config['reddit_active_channels']
+    def setUp(self):
+        self.subreddits = config.get('subreddits')
+        self.active_channels = config.get('channels')
+        self.db = self.client.db
         self.feeds = {}
-        self.announced = AnnouncedArticles()
         self.started = False
         for sub in self.subreddits:
             self.feeds[sub] = 'https://www.reddit.com/r/%s/new/.rss' % sub
-            self.announced.emit(sub, None)
         self.client.register_loop(self.check_feeds, interval=30)
 
     def _generate_attachment(self, item, link):
@@ -71,8 +57,14 @@ class SlackBotPlugin(BasePlugin):
                     last = response['items'][0]
                 except IndexError:
                     return
-                if last['title'] not in self.announced.records[sub]:
-                    self.announced.emit(sub, last['title'])
+                announced = self.db.get_value(sub)
+                if not announced or last['title'] not in announced:
+                    if not announced:
+                        announced = [last['title']]
+                    else:
+                        if len(announced) >= 10:
+                            del announced[0]
+                        announced.append(last['title'])
                     response = self._parse_item(last)
                     if response:
                         for channel in self.active_channels:
@@ -81,15 +73,24 @@ class SlackBotPlugin(BasePlugin):
                                 '',
                                 [response]
                             )
+                    self.db.store_value(sub, announced)
         else:
             self.started = True
             for sub, feed in self.feeds.items():
+                announced = self.db.get_value(sub)
                 response = feedparser.parse(feed)
                 try:
                     last = response['items'][0]
-                    self.announced.emit(sub, last['title'])
+                    if announced:
+                        if len(announced) >= 10:
+                            del announced[0]
+                        if last['title'] not in announced:
+                            announced.append(last['title'])
+                    else:
+                        announced = [last['title']]
+                    self.db.store_value(sub, announced)
                 except IndexError:
                     return
 
-    def on_recv(self, channel, user, words):
+    def on_recv(self, channel, user, cmd, words):
         pass

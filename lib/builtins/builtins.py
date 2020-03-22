@@ -1,13 +1,12 @@
 #!/usr/bin/python3
 
-from lib.dbconnection import DatabaseSession
 from threading import Thread
 from time import sleep
 import os
 import re
 
 basedir = dir_path = os.path.dirname(os.path.realpath(__file__))
-with open(os.path.join(basedir, '..', '.git', 'config'), 'r') as f:
+with open(os.path.join(basedir, '..', '..', '.git', 'config'), 'r') as f:
     git_config = f.read()
     SOURCE = re.search(
             'url = (.*)',
@@ -38,11 +37,17 @@ class BasePlugin(object):
         except Exception:
             pass
 
-    def _on_recv(self, channel, user, words):
-        return self.on_recv(channel, user, words)
+    def _on_recv(self, channel, user, cmd, words):
+        return self.on_recv(channel, user, cmd, words)
 
-    def _on_trigger(self, channel, user, words=None):
+    def _on_trigger(self, channel, user, words):
         return self.on_trigger(channel, user, words)
+
+    def _on_context(self, channel, user, ctx, words):
+        return self.on_context(channel, user, ctx, words)
+
+    def _setUp(self):
+        return self.setUp()
 
     def get_trigger(self, words):
         message = ' '.join(words).lower()
@@ -57,50 +62,6 @@ class BasePlugin(object):
         return trigger
 
 
-class BuiltInConsole(BasePlugin):
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.prompt = ">>> "
-        self.cmds = ['send', 'act']
-        Thread(target=self.start).start()
-
-    def start(self):
-        while True:
-            if self.client.load_complete:
-                try:
-                    execs = input(self.prompt)
-                except KeyboardInterrupt:
-                    break
-                if execs:
-                    split = execs.split()
-                    cmd = split[0]
-                    if cmd == 'send':
-                        self.send_message(split)
-                    elif cmd == 'act':
-                        self.send_message(split, action=True)
-            else:
-                sleep(1)
-
-    def send_message(self, split, action=False):
-        try:
-            chan = split[1]
-            msg = ' '.join(split[2:])
-        except IndexError:
-            chan = None
-            msg = None
-        if chan and msg:
-            self.client.send_channel_message(
-                chan,
-                msg,
-                attachments=[],
-                action=action
-            )
-
-    def on_recv(self, channel, user, words):
-        pass
-
-
 class BuiltInHelp(BasePlugin):
 
     hooks = ['list', 'help']
@@ -111,26 +72,25 @@ class BuiltInHelp(BasePlugin):
 
     def recv_list(self):
         items = []
-        for item in self.client.registered_hooks:
+        for item in self.client.plugins.get_all_hooks():
             items.append('`%s`' % item)
         commands = ', '.join(items)
         return "Loaded commands: %s" % commands
 
     def recv_help(self, words):
         try:
-            command = words[1]
+            command = words[0]
         except IndexError:
             return self.client.get_help_page('help')
-        for item in self.client.help_pages:
-            for key, value in item.items():
-                if key == command:
-                    return value
+        help_page = self.client.get_help_page(command)
+        if help_page:
+            return help_page
         return "I don't have a help page for that command"
 
-    def on_recv(self, channel, user, words):
-        if words[0] == 'list':
+    def on_recv(self, channel, user, cmd, words):
+        if cmd == 'list':
             return self.recv_list()
-        elif words[0] == 'help':
+        elif cmd == 'help':
             return self.recv_help(words)
 
 
@@ -144,26 +104,9 @@ class BuiltInReload(BasePlugin):
                         Plugins - Bot Plugins"}
             ]
 
-    def on_recv(self, channel, user, words):
-        if words[0].lower() in self.hooks:
-            try:
-                target = words[1]
-            except IndexError:
-                return self.client.get_help_page('reload')
-            if target.lower() == 'users':
-                self.client._get_users()
-                return "Reloaded User Data!"
-            elif target.lower() == 'config':
-                self.client._read_config()
-                return "Reloaded Configuration!"
-            elif target.lower() == 'plugins':
-                self.client.dbsession = DatabaseSession()
-                self.client._load_builtin_plugins()
-                plugins = self.client._scrape_plugins()
-                self.client._register_plugins(plugins)
-                return "Reloaded Plugins!"
-            else:
-                return "I don't understand!"
+    def on_recv(self, channel, user, cmd, words):
+        if cmd == 'reload':
+            return "This functionality is broken at the moment"
 
 
 class BuiltInSource(BasePlugin):
@@ -178,8 +121,8 @@ class BuiltInSource(BasePlugin):
         if self.get_trigger(words):
             return "View my source @ %s" % SOURCE
 
-    def on_recv(self, channel, user, words):
-        if words[0].lower() in self.hooks:
+    def on_recv(self, channel, user, cmd, words):
+        if cmd == 'source':
             return "View my source @ %s" % SOURCE
 
 
@@ -190,10 +133,10 @@ class BuiltInRestart(BasePlugin):
                 {"restart": "restart - Reboots the bot"}
             ]
 
-    def on_recv(self, channel, user, words):
-        if words[0].lower() in self.hooks:
+    def on_recv(self, channel, user, cmd, words):
+        if cmd == 'restart':
             self.client.send_channel_message(channel, "Be back in a bit!")
-            self.client._restart()
+            self.client.restart()
 
 
 class BuiltInShutdown(BasePlugin):
@@ -203,10 +146,10 @@ class BuiltInShutdown(BasePlugin):
                 {"shutdown": "shutdown - Shuts the bot down"}
             ]
 
-    def on_recv(self, channel, user, words):
-        if words[0].lower() in self.hooks:
+    def on_recv(self, channel, user, cmd, words):
+        if cmd == 'shutdown':
             self.client.send_channel_message(channel, "Bye!")
-            self.client._shutdown()
+            self.client.shutdown()
 
 
 class BuiltInGreet(BasePlugin):
@@ -216,10 +159,10 @@ class BuiltInGreet(BasePlugin):
                 {"greet": "greet <@mention> - Greets a user by their name"}
             ]
 
-    def on_recv(self, channel, user, words):
-        if words[0].lower() in self.hooks:
+    def on_recv(self, channel, user, cmd, words):
+        if cmd == 'greet':
             try:
-                user = words[1]
+                user = words[0]
             except IndexError:
                 return self.client.get_help_page('greet')
             user_id = self.client.sanitize_handle(user)

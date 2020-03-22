@@ -1,18 +1,18 @@
 #!/usr/bin/python3
 
 from lib.builtins import BasePlugin
+from lib.config import SlackBotConfig as config
 import feedparser
 
 
 class SlackBotPlugin(BasePlugin):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.active_channels = self.client.config['aws_active_channels']
+    def setUp(self):
+        self.active_channels = config.get('channels')
         self.feed = 'https://aws.amazon.com/new/feed'
         self.announced = []
         self.started = False
-        self.client.register_loop(self.check_feeds)
+        self.client.register_loop(self.check_feeds, interval=30)
 
     def _generate_attachment(self, item):
         attachment = {
@@ -46,5 +46,5 @@ class SlackBotPlugin(BasePlugin):
             last = response['items'][0]
             self.announced.append(last)
 
-    def on_recv(self, channel, user, words):
+    def on_recv(self, channel, user, cmd, words):
         pass

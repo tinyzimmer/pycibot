@@ -13,8 +13,7 @@ class SlackBotPlugin(BasePlugin):
     hooks = ['excuse']
     help_pages = [{'excuse': 'excuse - grab a random excuse'}]
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def setUp(self):
         self._populate_excuses()
 
     def _populate_excuses(self):
@@ -25,7 +24,6 @@ class SlackBotPlugin(BasePlugin):
     def on_trigger(self, channel, user, words):
         pass
 
-    def on_recv(self, channel, user, words):
-        if words[0] == 'excuse':
-            secure_random = random.SystemRandom()
-            return secure_random.choice(self.excuses).strip()
+    def on_recv(self, channel, user, cmd, words):
+        secure_random = random.SystemRandom()
+        return secure_random.choice(self.excuses).strip()

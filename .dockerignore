@@ -1,0 +1,7 @@
+*.sqlite
+*.sqlite3
+venv
+__pycache__
+pv
+config.yml
+sentence_tokenizer.pickle
