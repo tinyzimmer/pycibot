@@ -13,7 +13,7 @@ mathparse==0.1.2
 multidict==4.7.5
 murmurhash==1.0.2
 nltk==3.4.5
-numpy==1.18.1
+numpy==1.22.0
 Pint==0.11
 plac==0.9.6
 preshed==2.0.1
