@@ -2,7 +2,7 @@ aiohttp==3.6.2
 async-timeout==3.0.1
 attrs==19.3.0
 blis==0.2.4
-certifi==2017.11.5
+certifi==2022.12.7
 chardet==3.0.4
 ChatterBot==1.0.5
 chatterbot-corpus==1.2.0
